@@ -10,7 +10,8 @@ import re
 path_to_model_spell = "model/M2M100ForConditionalGeneration/" 
 path_to_tokenizer_spell = "model/M2M100Tokenizer/"
 
-path_to_model_NER_names = "model/bert-finetuned-ner-names-accelerate" 
+path_to_model_NER_names = "model/stable/bert-finetuned-ner-names-accelerate" 
+path_to_model_NER_addresses = "model/stable/bert-finetuned-ner-addresses-accelerate" 
 
 # Определение моделей
 
@@ -24,14 +25,39 @@ label_names = ['PER-NAME', 'PER-SURN', 'PER-PATR']
 id2label = {i: label for i, label in enumerate(label_names)}
 label2id = {v: k for k, v in id2label.items()}
 
-model_NER = AutoModelForTokenClassification.from_pretrained(path_to_model_NER_names,
+model_NER_name = AutoModelForTokenClassification.from_pretrained(path_to_model_NER_names,
                                                                id2label=id2label,
                                                                label2id=label2id)
-tokenizer_NER = AutoTokenizer.from_pretrained(path_to_model_NER_names, use_fast=True)
+tokenizer_NER_name = AutoTokenizer.from_pretrained(path_to_model_NER_names, use_fast=True)
 
-token_classifier = pipeline(
-    "token-classification", model=model_NER, aggregation_strategy="simple", tokenizer=tokenizer_NER
+token_classifier_name = pipeline(
+    "token-classification", model=model_NER_name, aggregation_strategy="simple", tokenizer=tokenizer_NER_name
 )
+
+## NER для адресов
+label_names = ["LOC-REG", 
+               "LOC-DIST", 
+               "LOC-SETL", 
+               "LOC-CDIST", 
+               "LOC-STRT", 
+               "LOC-HOUS", 
+               "LOC-FLAT"]
+
+id2label = {i: label for i, label in enumerate(label_names)}
+label2id = {v: k for k, v in id2label.items()}
+
+model_NER_adr = AutoModelForTokenClassification.from_pretrained(path_to_model_NER_addresses,
+                                                               id2label=id2label,
+                                                               label2id=label2id)
+
+tokenizer_NER_adr = AutoTokenizer.from_pretrained(path_to_model_NER_addresses, use_fast=True)
+
+token_classifier_adr = pipeline(
+    "token-classification", model=model_NER_adr, aggregation_strategy="simple", tokenizer=tokenizer_NER_adr
+)
+
+
+# Функции
 
 def correct_errors(sentence_in: str) -> str:
 
@@ -53,7 +79,7 @@ def correct_errors(sentence_in: str) -> str:
                                                  max_new_tokens = 200)
     answer = tokenizer_M100_spell.batch_decode(generated_tokens, skip_special_tokens=True)
 
-    return answer[0]
+    return re.sub('[^а-яА-яёЁ\.\-, ]+', '', answer[0])
 
 
 def name_reconstruct(name: str) -> str:
@@ -78,7 +104,7 @@ def name_reconstruct(name: str) -> str:
 
     name_tokens = re.findall("[а-яА-ЯЁё\-]+", name)
 
-    NER_output = token_classifier(name_tokens)
+    NER_output = token_classifier_name(name_tokens)
 
     name_classes =  np.array([elem[0]['entity_group'] for elem in NER_output])
 
@@ -94,5 +120,95 @@ def name_reconstruct(name: str) -> str:
         other_name_part = string_out.split()[nameparts_counts[1][-1]:]
 
         string_out = surnames[0] + " (" + ", ".join(surnames[1:]) + ") " + " ".join(other_name_part)
+
+    return(string_out)
+
+
+def address_reconstruct(address: str) -> str:
+
+    """
+    Функция для исправления формата адреса в формат Регион, район, город/поселок, улица, дом, квартира 
+
+    Параметры:
+    address : str
+        Строка, содержащая адрес
+
+    Возвращает:
+    string_out : str
+        Строка с адресом требуемого формата
+    """
+
+    # создание словаря для сортировки элементов адреса
+    entities = ["O", "REG", "DIST", "SETL", "CDIST", "STRT", "HOUS", "FLAT"]
+    
+    sort_dict = {key: elem for elem, key in list(enumerate(entities))}
+
+    adr_tokens = address.strip().split(", ")
+
+    # print(adr_tokens)
+
+    NER_output = list(token_classifier_adr(adr_tokens))
+
+    addresses = [[]]
+    adr_entities = [[]]
+    i = 0
+
+    for token, elem in zip(adr_tokens, NER_output):
+
+        if len(elem) > 1:
+
+            if elem[0]["start"] > 0:
+
+                i += 1
+                addresses.append([token[:elem[0]["start"]]])
+                adr_entities.append(["O"])
+
+            for subelem in elem:
+
+                addresses[i].append(subelem["word"])
+                adr_entities[i].append(subelem["entity_group"])
+
+            if elem[-1]["end"] < len(token)-1:
+
+                addresses.append([token[elem[-1]["end"]:]])
+                adr_entities[i].append("O")
+
+        else:
+            addresses[i].append(token)
+            adr_entities[i].append(elem[0]["entity_group"])
+
+    # print(addresses)
+    # print(adr_entities)
+
+    final_list = []
+
+    for adr_lst, entity in zip(addresses, adr_entities):      
+
+        # print("tokens:", adr_lst)
+        # print("entities:", entity)    
+
+        if entity[0] == "O":
+                idx_start = 1
+                left = adr_lst[0]
+        else:
+                idx_start = 0
+                left = ""
+
+        if entity[-1] == "O":
+                idx_end = len(entity) - 1
+                right = adr_lst[-1]
+        else:
+                idx_end = len(entity)
+                right = ""
+
+        adr_sorted = [x for _, x in sorted(zip(entity[idx_start:idx_end], adr_lst[idx_start:idx_end]), \
+                                            key = lambda pair: sort_dict[pair[0]])]
+
+        final_list.append(left + ", ".join(adr_sorted) + right)
+        
+        # print(final_list)
+
+    # # переформирование адреса
+    string_out = ", ".join(final_list)
 
     return(string_out)
