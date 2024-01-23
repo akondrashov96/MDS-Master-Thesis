@@ -12,7 +12,7 @@ from copy import copy
 
 from src.logger import logFile
 from src.utilities import RussianParserInfo
-from src.spellcheck import correct_errors, name_reconstruct
+from src.spellcheck import correct_errors, name_reconstruct, address_reconstruct
 
 
 # Настройки
@@ -121,6 +121,9 @@ def sort_address(adress_text: str) -> str:
     """
     Функция для проверки и корректировки по условию 4: 
     При заполнении адресов проживания и работы сначала необходимо указывать регион: республику, край, область.
+
+    23.01.2024: DEPRECATED: Функция заменена на функцию address_reconstruct() из модуля spellcheck, 
+    данная функцию использует нейросеть для определения адресов.
 
     Параметры:
     adress_text : str
@@ -554,7 +557,7 @@ def file_processor(filename: str, workdir: str = workdir, logfile: str = "", ver
     if verbose: print(f"Проверка условия 4")
 
     # Переупорядочивание элементов адреса
-    data_sheets[1]["Адрес организации"] = data_sheets[1]["Адрес организации"].map(sort_address)
+    data_sheets[1]["Адрес организации"] = data_sheets[1]["Адрес организации"].map(address_reconstruct)
 
     # Лог 9
     msg = f"{filename}: Лист 2: Условие 4 исправлено"
@@ -620,7 +623,7 @@ def file_processor(filename: str, workdir: str = workdir, logfile: str = "", ver
     if verbose: print(f"Проверка условия 4 (тут нужен NER)")
 
     # Переупорядочивание элементов адреса (TO DO)
-    # data_sheets[2]["Адрес места жительства"] = data_sheets[2]["Адрес места жительства"].map(sort_address)
+    # data_sheets[2]["Адрес места жительства"] = data_sheets[2]["Адрес места жительства"].map(address_reconstruct)
 
     # Лог 14
     msg = f"{filename}: Лист 3: Условие 4 исправлено"
@@ -696,7 +699,7 @@ def file_processor(filename: str, workdir: str = workdir, logfile: str = "", ver
     if verbose: print(f"Проверка условия 4")
 
     # Переупорядочивание элементов адреса
-    data_sheets_3_2["Адрес проживания и регистрации"] = data_sheets_3_2["Адрес проживания и регистрации"].map(sort_address)
+    data_sheets_3_2["Адрес проживания и регистрации"] = data_sheets_3_2["Адрес проживания и регистрации"].map(address_reconstruct)
 
     # Лог 20
     msg = f"{filename}: Лист 4: Условие 4 исправлено"

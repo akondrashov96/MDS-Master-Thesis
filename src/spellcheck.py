@@ -2,13 +2,17 @@ from transformers import M2M100ForConditionalGeneration, M2M100Tokenizer, pipeli
     AutoModelForTokenClassification, AutoTokenizer
 import numpy as np
 import re
+import torch
 
 # Универсальный путь (на HuggingFace)
 # path_to_model = "ai-forever/RuM2M100-1.2B" 
 
 # Пользовательские (локальные) пути к модели и токенизатору
-path_to_model_spell = "model/M2M100ForConditionalGeneration/" 
-path_to_tokenizer_spell = "model/M2M100Tokenizer/"
+# path_to_model_spell = "model/M2M100ForConditionalGeneration/" 
+# path_to_tokenizer_spell = "model/M2M100Tokenizer/"
+
+path_to_model_spell = "model/M2M100_spellchecker/quantized_model.pt" 
+path_to_tokenizer_spell = "model/M2M100_tokenizer/"
 
 path_to_model_NER_names = "model/stable/bert-finetuned-ner-names-accelerate" 
 path_to_model_NER_addresses = "model/stable/bert-finetuned-ner-addresses-accelerate" 
@@ -16,8 +20,11 @@ path_to_model_NER_addresses = "model/stable/bert-finetuned-ner-addresses-acceler
 # Определение моделей
 
 ## Spellchecker
-model_M100_spell = M2M100ForConditionalGeneration.from_pretrained(path_to_model_spell)
+# model_M100_spell = M2M100ForConditionalGeneration.from_pretrained(path_to_model_spell)
 tokenizer_M100_spell = M2M100Tokenizer.from_pretrained(path_to_tokenizer_spell)
+
+model_M100_spell = torch.load(path_to_model_spell)
+model_M100_spell.eval()
 
 ## NER для имен
 label_names = ['PER-NAME', 'PER-SURN', 'PER-PATR']
@@ -74,12 +81,16 @@ def correct_errors(sentence_in: str) -> str:
     """
 
     encodings = tokenizer_M100_spell(sentence_in, return_tensors="pt")
+
     generated_tokens = model_M100_spell.generate(**encodings, 
                                                  forced_bos_token_id=tokenizer_M100_spell.get_lang_id("ru"), 
                                                  max_new_tokens = 200)
+    
     answer = tokenizer_M100_spell.batch_decode(generated_tokens, skip_special_tokens=True)
+    
+    answer = re.sub('[a-zA-Z]+', '', answer[0]).strip()
 
-    return re.sub('[^а-яА-яёЁ\.\-, ]+', '', answer[0])
+    return answer
 
 
 def name_reconstruct(name: str) -> str:
@@ -165,12 +176,17 @@ def address_reconstruct(address: str) -> str:
 
             for subelem in elem:
 
-                addresses[i].append(subelem["word"])
-                adr_entities[i].append(subelem["entity_group"])
+                if subelem[:2] == "##":
+                     
+                     addresses[i][-1] = addresses[i][-1] + subelem[2:]
+
+                else:
+                    addresses[i].append(subelem["word"])
+                    adr_entities[i].append(subelem["entity_group"])
 
             if elem[-1]["end"] < len(token)-1:
 
-                addresses.append([token[elem[-1]["end"]:]])
+                addresses[i].append(token[elem[-1]["end"]:])
                 adr_entities[i].append("O")
 
         else:
