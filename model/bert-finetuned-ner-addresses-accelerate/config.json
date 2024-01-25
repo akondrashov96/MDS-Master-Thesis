@@ -1,0 +1,50 @@
+{
+  "_name_or_path": "DeepPavlov/rubert-base-cased",
+  "architectures": [
+    "BertForTokenClassification"
+  ],
+  "attention_probs_dropout_prob": 0.1,
+  "classifier_dropout": null,
+  "directionality": "bidi",
+  "hidden_act": "gelu",
+  "hidden_dropout_prob": 0.1,
+  "hidden_size": 768,
+  "id2label": {
+    "0": "LOC-REG",
+    "1": "LOC-DIST",
+    "2": "LOC-SETL",
+    "3": "LOC-CDIST",
+    "4": "LOC-STRT",
+    "5": "LOC-HOUS",
+    "6": "LOC-FLAT"
+  },
+  "initializer_range": 0.02,
+  "intermediate_size": 3072,
+  "label2id": {
+    "LOC-CDIST": 3,
+    "LOC-DIST": 1,
+    "LOC-FLAT": 6,
+    "LOC-HOUS": 5,
+    "LOC-REG": 0,
+    "LOC-SETL": 2,
+    "LOC-STRT": 4
+  },
+  "layer_norm_eps": 1e-12,
+  "max_position_embeddings": 512,
+  "model_type": "bert",
+  "num_attention_heads": 12,
+  "num_hidden_layers": 12,
+  "output_past": true,
+  "pad_token_id": 0,
+  "pooler_fc_size": 768,
+  "pooler_num_attention_heads": 12,
+  "pooler_num_fc_layers": 3,
+  "pooler_size_per_head": 128,
+  "pooler_type": "first_token_transform",
+  "position_embedding_type": "absolute",
+  "torch_dtype": "float32",
+  "transformers_version": "4.31.0",
+  "type_vocab_size": 2,
+  "use_cache": true,
+  "vocab_size": 119547
+}
